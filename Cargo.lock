@@ -3919,6 +3919,7 @@ dependencies = [
 name = "zellij-plugin"
 version = "0.1.0"
 dependencies = [
+ "ratatui",
  "zellij-tile",
 ]
 
