@@ -10,7 +10,7 @@ pub struct State {
 }
 
 impl State {
-    const MAESTRO_BIN: &str = "/home/levifikri/.cargo/bin/maestro";
+    const MAESTRO_BIN: &str = "maestro";
 
     pub fn refresh_instances(&mut self) {
         self.loading = true;
