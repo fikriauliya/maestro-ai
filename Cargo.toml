@@ -1,3 +1,5 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+default-members = ["crates/cli"]
+# Note: zellij-plugin must be built with: cargo build -p zellij-plugin --target wasm32-wasip1

@@ -8,5 +8,5 @@ zellij plugin \
     --x 70% \
     --y 80% \
     --skip-plugin-cache \
-    -- "file:$SCRIPT_DIR/target/wasm32-wasip1/release/zellij-plugin.wasm"
+    -- "file:$SCRIPT_DIR/target/wasm32-wasip1/debug/zellij-plugin.wasm"
 
