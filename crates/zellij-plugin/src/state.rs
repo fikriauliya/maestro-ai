@@ -1,15 +1,12 @@
 use zellij_tile::prelude::*;
 
-use crate::instance::{ClaudeInstance, MaestroOutput};
+use crate::instance::ClaudeInstance;
 
 #[derive(Default)]
 pub struct State {
     pub instances: Vec<ClaudeInstance>,
     pub selected_index: usize,
     pub loading: bool,
-    pub version: String,
-    pub build: String,
-    pub error: Option<String>,
 }
 
 impl State {
@@ -22,10 +19,8 @@ impl State {
         run_command(&[Self::MAESTRO_BIN, "list", "--json"], context);
     }
 
-    pub fn set_from_output(&mut self, output: MaestroOutput) {
-        self.version = output.version;
-        self.build = output.build;
-        self.instances = output.instances;
+    pub fn set_instances(&mut self, instances: Vec<ClaudeInstance>) {
+        self.instances = instances;
         if self.selected_index >= self.instances.len() && !self.instances.is_empty() {
             self.selected_index = self.instances.len() - 1;
         }

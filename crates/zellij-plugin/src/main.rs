@@ -1,9 +1,7 @@
-mod ansi;
 mod instance;
 mod state;
 mod ui;
 
-use ratatui::{buffer::Buffer, layout::Rect};
 use zellij_tile::prelude::*;
 
 use crate::instance::MaestroOutput;
@@ -35,17 +33,13 @@ impl ZellijPlugin for State {
                 set_timeout(1.0);
                 true
             }
-            Event::RunCommandResult(exit_code, stdout, stderr, context) => {
+            Event::RunCommandResult(exit_code, stdout, _stderr, context) => {
                 if context.get("source").map(|s| s.as_str()) == Some("instances") {
                     if exit_code == Some(0) {
                         let output = MaestroOutput::parse(&stdout);
-                        self.set_from_output(output);
-                        self.error = None;
+                        self.set_instances(output.instances);
                     } else {
-                        // Command failed - show error
-                        let err = String::from_utf8_lossy(&stderr).to_string();
-                        self.error = Some(format!("exit {:?}: {}", exit_code, err));
-                        self.set_from_output(MaestroOutput::default());
+                        self.set_instances(Vec::new());
                     }
                     self.loading = false;
                 }
@@ -57,15 +51,6 @@ impl ZellijPlugin for State {
     }
 
     fn render(&mut self, rows: usize, cols: usize) {
-        let area = Rect::new(0, 0, cols as u16, rows as u16);
-        let mut buf = Buffer::empty(area);
-
-        if self.loading {
-            ui::render_loading(area, &mut buf);
-        } else {
-            ui::render_list(self, area, &mut buf);
-        }
-
-        ansi::render_buffer(&buf);
+        ui::render(self, rows, cols);
     }
 }
