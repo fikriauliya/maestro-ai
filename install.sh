@@ -4,11 +4,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Build release binaries
-echo "Building CLI..."
-cargo build --release -p maestro
-
-echo "Building Zellij plugin..."
-cargo build --release -p zellij-plugin --target wasm32-wasip1
+make -C "$SCRIPT_DIR" release
 
 # Install CLI
 CLI_DEST="${HOME}/.local/bin"
