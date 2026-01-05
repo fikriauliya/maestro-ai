@@ -1,38 +1,32 @@
 use zellij_tile::prelude::*;
 
-use crate::process::ProcessInfo;
-
-#[derive(Default, PartialEq, Clone, Copy)]
-pub enum View {
-    #[default]
-    List,
-    Detail,
-}
+use crate::instance::ClaudeInstance;
 
 #[derive(Default)]
 pub struct State {
-    pub processes: Vec<ProcessInfo>,
+    pub instances: Vec<ClaudeInstance>,
     pub selected_index: usize,
-    pub view: View,
     pub loading: bool,
 }
 
 impl State {
-    pub fn refresh_processes(&mut self) {
+    const DATA_FILE: &str = "/tmp/maestro-ai/instances.json";
+
+    pub fn refresh_instances(&mut self) {
         self.loading = true;
         let mut context = std::collections::BTreeMap::new();
-        context.insert("source".to_string(), "ps".to_string());
-        run_command(&["ps", "aux", "--sort=-%cpu"], context);
+        context.insert("source".to_string(), "instances".to_string());
+        run_command(&["cat", Self::DATA_FILE], context);
     }
 
-    pub fn set_processes(&mut self, processes: Vec<ProcessInfo>) {
-        self.processes = processes;
-        if self.selected_index >= self.processes.len() {
-            self.selected_index = 0;
+    pub fn set_instances(&mut self, instances: Vec<ClaudeInstance>) {
+        self.instances = instances;
+        if self.selected_index >= self.instances.len() && !self.instances.is_empty() {
+            self.selected_index = self.instances.len() - 1;
         }
     }
 
-    pub fn handle_list_keys(&mut self, key: KeyWithModifier) -> bool {
+    pub fn handle_keys(&mut self, key: KeyWithModifier) -> bool {
         match key.bare_key {
             BareKey::Up | BareKey::Char('k') => {
                 if self.selected_index > 0 {
@@ -41,19 +35,17 @@ impl State {
                 true
             }
             BareKey::Down | BareKey::Char('j') => {
-                if self.selected_index < self.processes.len().saturating_sub(1) {
+                if self.selected_index < self.instances.len().saturating_sub(1) {
                     self.selected_index += 1;
                 }
                 true
             }
             BareKey::Enter => {
-                if !self.processes.is_empty() {
-                    self.view = View::Detail;
-                }
+                self.focus_selected_instance();
                 true
             }
             BareKey::Char('r') => {
-                self.refresh_processes();
+                self.refresh_instances();
                 true
             }
             BareKey::Esc | BareKey::Char('q') => {
@@ -64,17 +56,11 @@ impl State {
         }
     }
 
-    pub fn handle_detail_keys(&mut self, key: KeyWithModifier) -> bool {
-        match key.bare_key {
-            BareKey::Esc | BareKey::Backspace | BareKey::Char('q') => {
-                self.view = View::List;
-                true
-            }
-            _ => false,
+    pub fn focus_selected_instance(&self) {
+        if let Some(instance) = self.instances.get(self.selected_index) {
+            focus_terminal_pane(instance.pane_id, true);
+            hide_self();
         }
     }
 
-    pub fn selected_process(&self) -> Option<&ProcessInfo> {
-        self.processes.get(self.selected_index)
-    }
 }

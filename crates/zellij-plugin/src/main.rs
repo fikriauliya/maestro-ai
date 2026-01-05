@@ -1,13 +1,13 @@
 mod ansi;
-mod process;
+mod instance;
 mod state;
 mod ui;
 
 use ratatui::{buffer::Buffer, layout::Rect};
 use zellij_tile::prelude::*;
 
-use crate::process::ProcessInfo;
-use crate::state::{State, View};
+use crate::instance::ClaudeInstance;
+use crate::state::State;
 
 register_plugin!(State);
 
@@ -16,6 +16,7 @@ impl ZellijPlugin for State {
         request_permission(&[PermissionType::RunCommands]);
         subscribe(&[
             EventType::Key,
+            EventType::Timer,
             EventType::RunCommandResult,
             EventType::PermissionRequestResult,
         ]);
@@ -25,26 +26,29 @@ impl ZellijPlugin for State {
     fn update(&mut self, event: Event) -> bool {
         match event {
             Event::PermissionRequestResult(PermissionStatus::Granted) => {
-                self.refresh_processes();
+                self.refresh_instances();
+                set_timeout(1.0);
+                true
+            }
+            Event::Timer(_) => {
+                self.refresh_instances();
+                set_timeout(1.0);
                 true
             }
             Event::RunCommandResult(exit_code, stdout, _stderr, context) => {
-                if context.get("source").map(|s| s.as_str()) == Some("ps") {
+                if context.get("source").map(|s| s.as_str()) == Some("instances") {
                     if exit_code == Some(0) {
-                        let processes = ProcessInfo::parse_ps_output(&stdout);
-                        self.set_processes(processes);
+                        let instances = ClaudeInstance::parse_json(&stdout);
+                        self.set_instances(instances);
+                    } else {
+                        // File doesn't exist or error - clear instances
+                        self.set_instances(Vec::new());
                     }
                     self.loading = false;
                 }
                 true
             }
-            Event::Key(key) => {
-                if self.view == View::List {
-                    self.handle_list_keys(key)
-                } else {
-                    self.handle_detail_keys(key)
-                }
-            }
+            Event::Key(key) => self.handle_keys(key),
             _ => false,
         }
     }
@@ -55,10 +59,8 @@ impl ZellijPlugin for State {
 
         if self.loading {
             ui::render_loading(area, &mut buf);
-        } else if self.view == View::List {
-            ui::render_list(self, area, &mut buf);
         } else {
-            ui::render_detail(self, area, &mut buf);
+            ui::render_list(self, area, &mut buf);
         }
 
         ansi::render_buffer(&buf);

@@ -1,20 +1,134 @@
-use ratatui::{DefaultTerminal, Frame};
+mod instance;
 
-fn main() -> color_eyre::Result<()> {
-    color_eyre::install()?;
-    ratatui::run(app)?;
-    Ok(())
+use clap::{Parser, Subcommand};
+use instance::{InstanceStore, Status};
+use serde::Deserialize;
+use std::io::{self, Read};
+use std::path::Path;
+
+#[derive(Parser)]
+#[command(name = "maestro")]
+#[command(about = "Manage Claude Code instances in Zellij")]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
 }
 
-fn app(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
-    loop {
-        terminal.draw(render)?;
-        if crossterm::event::read()?.is_key_press() {
-            break Ok(());
+#[derive(Subcommand)]
+enum Commands {
+    /// Register a new Claude Code instance (reads JSON from stdin)
+    Register,
+
+    /// Update status of current instance
+    Update {
+        /// Status to set
+        #[arg(value_parser = ["running", "waiting"])]
+        status: String,
+    },
+
+    /// Unregister current Claude Code instance
+    Unregister,
+
+    /// List all registered instances
+    List,
+}
+
+#[derive(Deserialize)]
+struct HookInput {
+    cwd: Option<String>,
+}
+
+fn get_pane_id() -> Option<u32> {
+    std::env::var("ZELLIJ_PANE_ID")
+        .ok()
+        .and_then(|s| s.parse().ok())
+}
+
+fn read_stdin_json() -> Option<HookInput> {
+    let mut buffer = String::new();
+    io::stdin().read_to_string(&mut buffer).ok()?;
+    serde_json::from_str(&buffer).ok()
+}
+
+fn main() {
+    let cli = Cli::parse();
+    let store = InstanceStore::new();
+
+    let result = match cli.command {
+        Commands::Register => {
+            let pane_id = match get_pane_id() {
+                Some(id) => id,
+                None => {
+                    eprintln!("ZELLIJ_PANE_ID not set");
+                    std::process::exit(1);
+                }
+            };
+
+            let input = read_stdin_json();
+            let cwd = input.and_then(|i| i.cwd).unwrap_or_else(|| {
+                std::env::current_dir()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default()
+            });
+
+            let folder = Path::new(&cwd)
+                .file_name()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| cwd.clone());
+
+            store.register(pane_id, folder)
         }
-    }
-}
 
-fn render(frame: &mut Frame) {
-    frame.render_widget("hello world", frame.area());
+        Commands::Update { status } => {
+            let pane_id = match get_pane_id() {
+                Some(id) => id,
+                None => {
+                    eprintln!("ZELLIJ_PANE_ID not set");
+                    std::process::exit(1);
+                }
+            };
+
+            // Consume stdin (required by hooks)
+            let _ = read_stdin_json();
+
+            let status: Status = status.parse().unwrap();
+            store.update_status(pane_id, status)
+        }
+
+        Commands::Unregister => {
+            let pane_id = match get_pane_id() {
+                Some(id) => id,
+                None => {
+                    eprintln!("ZELLIJ_PANE_ID not set");
+                    std::process::exit(1);
+                }
+            };
+
+            // Consume stdin (required by hooks)
+            let _ = read_stdin_json();
+
+            store.unregister(pane_id)
+        }
+
+        Commands::List => {
+            let instances = store.load();
+            if instances.is_empty() {
+                println!("No Claude Code instances registered");
+            } else {
+                for inst in instances {
+                    let icon = match inst.status {
+                        Status::Running => "⚡",
+                        Status::Waiting => "⏳",
+                    };
+                    println!("{} {} (pane {})", icon, inst.folder, inst.pane_id);
+                }
+            }
+            Ok(())
+        }
+    };
+
+    if let Err(e) = result {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    }
 }
