@@ -11,7 +11,10 @@ register_plugin!(State);
 
 impl ZellijPlugin for State {
     fn load(&mut self, _configuration: std::collections::BTreeMap<String, String>) {
-        request_permission(&[PermissionType::RunCommands]);
+        request_permission(&[
+            PermissionType::RunCommands,
+            PermissionType::ChangeApplicationState,
+        ]);
         subscribe(&[
             EventType::Key,
             EventType::Timer,
