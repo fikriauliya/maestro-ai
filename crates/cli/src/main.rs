@@ -6,12 +6,32 @@ use serde::Deserialize;
 use std::io::{self, Read};
 use std::path::Path;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[cfg(debug_assertions)]
+const BUILD_PROFILE: &str = "debug";
+#[cfg(not(debug_assertions))]
+const BUILD_PROFILE: &str = "release";
+
+fn version_string() -> &'static str {
+    if cfg!(debug_assertions) {
+        concat!(env!("CARGO_PKG_VERSION"), " (debug)")
+    } else {
+        concat!(env!("CARGO_PKG_VERSION"), " (release)")
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "maestro")]
 #[command(about = "Manage Claude Code instances in Zellij")]
+#[command(version = version_string())]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
+
+    /// Print version information as JSON
+    #[arg(long)]
+    version_json: bool,
 }
 
 #[derive(Subcommand)]
@@ -30,7 +50,11 @@ enum Commands {
     Unregister,
 
     /// List all registered instances
-    List,
+    List {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Deserialize)]
@@ -52,9 +76,24 @@ fn read_stdin_json() -> Option<HookInput> {
 
 fn main() {
     let cli = Cli::parse();
+
+    if cli.version_json {
+        let version_info = serde_json::json!({
+            "version": VERSION,
+            "build": BUILD_PROFILE
+        });
+        println!("{}", version_info);
+        return;
+    }
+
+    let Some(command) = cli.command else {
+        eprintln!("No command provided. Use --help for usage.");
+        std::process::exit(1);
+    };
+
     let store = InstanceStore::new();
 
-    let result = match cli.command {
+    let result = match command {
         Commands::Register => {
             let pane_id = match get_pane_id() {
                 Some(id) => id,
@@ -110,9 +149,16 @@ fn main() {
             store.unregister(pane_id)
         }
 
-        Commands::List => {
+        Commands::List { json } => {
             let instances = store.load();
-            if instances.is_empty() {
+            if json {
+                let output = serde_json::json!({
+                    "version": VERSION,
+                    "build": BUILD_PROFILE,
+                    "instances": instances
+                });
+                println!("{}", output);
+            } else if instances.is_empty() {
                 println!("No Claude Code instances registered");
             } else {
                 for inst in instances {

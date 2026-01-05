@@ -6,7 +6,7 @@ mod ui;
 use ratatui::{buffer::Buffer, layout::Rect};
 use zellij_tile::prelude::*;
 
-use crate::instance::ClaudeInstance;
+use crate::instance::MaestroOutput;
 use crate::state::State;
 
 register_plugin!(State);
@@ -35,14 +35,17 @@ impl ZellijPlugin for State {
                 set_timeout(1.0);
                 true
             }
-            Event::RunCommandResult(exit_code, stdout, _stderr, context) => {
+            Event::RunCommandResult(exit_code, stdout, stderr, context) => {
                 if context.get("source").map(|s| s.as_str()) == Some("instances") {
                     if exit_code == Some(0) {
-                        let instances = ClaudeInstance::parse_json(&stdout);
-                        self.set_instances(instances);
+                        let output = MaestroOutput::parse(&stdout);
+                        self.set_from_output(output);
+                        self.error = None;
                     } else {
-                        // File doesn't exist or error - clear instances
-                        self.set_instances(Vec::new());
+                        // Command failed - show error
+                        let err = String::from_utf8_lossy(&stderr).to_string();
+                        self.error = Some(format!("exit {:?}: {}", exit_code, err));
+                        self.set_from_output(MaestroOutput::default());
                     }
                     self.loading = false;
                 }

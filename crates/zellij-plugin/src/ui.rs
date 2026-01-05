@@ -23,7 +23,7 @@ pub fn render_loading(area: Rect, buf: &mut Buffer) {
 
 pub fn render_list(state: &State, area: Rect, buf: &mut Buffer) {
     if state.instances.is_empty() {
-        render_empty(area, buf);
+        render_empty(state, area, buf);
         return;
     }
 
@@ -50,11 +50,15 @@ pub fn render_list(state: &State, area: Rect, buf: &mut Buffer) {
         })
         .collect();
 
+    let version_title = format_version(&state.version, &state.build);
+
+    let title = format!(" Claude Code Instances ({}) ", state.instances.len());
     let list = List::new(items)
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" Claude Code Instances ")
+                .title(title)
+                .title_top(Line::from(version_title).right_aligned())
                 .title_bottom(" ↑↓:Navigate  Enter:Switch  r:Refresh  q:Close "),
         )
         .highlight_style(
@@ -70,15 +74,34 @@ pub fn render_list(state: &State, area: Rect, buf: &mut Buffer) {
     StatefulWidget::render(list, area, buf, &mut list_state);
 }
 
-fn render_empty(area: Rect, buf: &mut Buffer) {
+fn render_empty(state: &State, area: Rect, buf: &mut Buffer) {
+    let version_title = format_version(&state.version, &state.build);
+
     let block = Block::default()
         .borders(Borders::ALL)
         .title(" Claude Code Instances ")
+        .title_top(Line::from(version_title).right_aligned())
         .title_bottom(" q:Close ");
 
-    let message = Paragraph::new("No Claude Code instances running")
+    let msg = if let Some(err) = &state.error {
+        err.as_str()
+    } else if state.version.is_empty() {
+        "No data (maestro command failed?)"
+    } else {
+        "No Claude Code instances running"
+    };
+
+    let message = Paragraph::new(msg)
         .block(block)
         .centered();
 
     message.render(area, buf);
+}
+
+fn format_version(version: &str, build: &str) -> String {
+    if version.is_empty() {
+        String::new()
+    } else {
+        format!(" v{version} ({build}) ")
+    }
 }

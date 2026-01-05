@@ -7,7 +7,13 @@ use ratatui::{
 pub fn render_buffer(buf: &Buffer) {
     let area = buf.area;
 
+    // Move cursor to home and clear screen
+    print!("\x1b[H\x1b[J");
+
     for y in area.top()..area.bottom() {
+        // Position cursor at start of this row (1-indexed)
+        print!("\x1b[{};1H", y + 1);
+
         let mut line = String::new();
         let mut current_style: Option<Style> = None;
 
