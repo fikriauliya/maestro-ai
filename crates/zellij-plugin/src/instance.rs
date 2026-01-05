@@ -11,8 +11,8 @@ pub enum InstanceStatus {
 impl InstanceStatus {
     pub fn icon(&self) -> &'static str {
         match self {
-            InstanceStatus::Running => "⚡",
-            InstanceStatus::Waiting => "⏳",
+            InstanceStatus::Running => "⚙️",
+            InstanceStatus::Waiting => "💬",
         }
     }
 }
