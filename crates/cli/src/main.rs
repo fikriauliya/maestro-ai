@@ -1,4 +1,5 @@
 mod instance;
+mod worktree;
 
 use clap::{Parser, Subcommand};
 use instance::{InstanceStore, Status};
@@ -55,6 +56,30 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Worktree management commands
+    Wt {
+        #[command(subcommand)]
+        command: WtCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum WtCommands {
+    /// List all worktrees
+    List,
+
+    /// Switch to a worktree (creates if it doesn't exist)
+    Switch {
+        /// Branch name
+        branch: String,
+    },
+
+    /// Remove current worktree and switch back to main
+    Remove,
+
+    /// Squash-merge current worktree to main and cleanup
+    Merge,
 }
 
 #[derive(Deserialize)]
@@ -170,6 +195,10 @@ fn main() {
                 }
             }
             Ok(())
+        }
+
+        Commands::Wt { command } => {
+            worktree::run(command)
         }
     };
 
