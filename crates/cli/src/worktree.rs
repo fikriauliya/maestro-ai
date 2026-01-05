@@ -1,3 +1,5 @@
+use crate::config::Config;
+use crate::layout::{generate_layout, get_editor_command, write_temp_layout};
 use crate::WtCommands;
 use std::io::{self, Error, ErrorKind};
 use std::path::{Path, PathBuf};
@@ -47,7 +49,7 @@ fn cmd_switch(branch: &str) -> io::Result<()> {
 
     // Check if worktree already exists for this branch
     if let Some(wt) = worktrees.iter().find(|w| w.branch.as_deref() == Some(branch)) {
-        exec_shell(&wt.path)?;
+        launch_zellij_layout(&wt.path, false)?;
         return Ok(());
     }
 
@@ -78,8 +80,57 @@ fn cmd_switch(branch: &str) -> io::Result<()> {
     }
 
     println!("Created worktree at {}", worktree_path.display());
-    exec_shell(&worktree_path)?;
+    launch_zellij_layout(&worktree_path, true)?;
     Ok(())
+}
+
+/// Launch Zellij with a layout for the worktree
+fn launch_zellij_layout(worktree_path: &Path, is_new: bool) -> io::Result<()> {
+    let config = Config::load(worktree_path);
+    let editor = get_editor_command();
+
+    // Determine which hooks to run
+    let (install_cmd, start_cmd) = match &config {
+        Some(cfg) => {
+            let install = if is_new || !Config::install_completed(worktree_path) {
+                cfg.hooks.install.as_deref()
+            } else {
+                None
+            };
+            let start = cfg.hooks.start.as_deref();
+            (install, start)
+        }
+        None => (None, None),
+    };
+
+    // Generate layout
+    let layout = generate_layout(worktree_path, &editor, install_cmd, start_cmd);
+    let layout_path = write_temp_layout(&layout)?;
+
+    // Mark install as completed if we're running it
+    if install_cmd.is_some() {
+        // We mark it before running so subsequent opens don't re-run install
+        // even if the current session is interrupted
+        let _ = Config::mark_install_completed(worktree_path);
+    }
+
+    // Launch Zellij with the layout
+    exec_zellij(&layout_path, worktree_path)
+}
+
+fn exec_zellij(layout_path: &Path, cwd: &Path) -> io::Result<()> {
+    use std::os::unix::process::CommandExt;
+
+    std::env::set_current_dir(cwd)?;
+
+    let err = Command::new("zellij")
+        .args(["--layout", &layout_path.to_string_lossy()])
+        .exec();
+
+    Err(Error::new(
+        ErrorKind::Other,
+        format!("Failed to exec zellij: {}", err),
+    ))
 }
 
 fn cmd_remove() -> io::Result<()> {

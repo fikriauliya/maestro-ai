@@ -1,4 +1,6 @@
+mod config;
 mod instance;
+mod layout;
 mod worktree;
 
 use clap::{Parser, Subcommand};
