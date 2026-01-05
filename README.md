@@ -5,14 +5,18 @@ Manage Claude Code instances in Zellij. Track running instances across panes and
 ## Installation
 
 ```bash
-# Build CLI
-cargo build --release -p maestro
+git clone https://github.com/user/maestro-ai
+cd maestro-ai
+./install.sh
+```
 
-# Build Zellij plugin
-cargo build --release -p zellij-plugin --target wasm32-wasip1
+This builds and installs:
+- CLI to `~/.local/bin/maestro`
+- Plugin to `~/.config/zellij/plugins/maestro.wasm`
 
-# Add CLI to PATH
-export PATH="$PATH:/path/to/maestro-ai/target/release"
+Make sure `~/.local/bin` is in your PATH:
+```bash
+export PATH="$PATH:$HOME/.local/bin"
 ```
 
 ## CLI Usage
@@ -52,6 +56,27 @@ zellij plugin --floating --pinned true \
 - `Enter`: Focus selected pane
 - `r`: Refresh list
 - `q/Esc`: Hide plugin
+
+## Zellij Keybinding
+
+Add a keyboard shortcut in `~/.config/zellij/config.kdl`:
+
+```kdl
+keybinds {
+    shared {
+        bind "Alt m" {
+            LaunchPlugin "file:~/.config/zellij/plugins/maestro.wasm" {
+                floating true
+                pinned true
+                width "20%"
+                height "20%"
+                x "80%"
+                y "80%"
+            }
+        }
+    }
+}
+```
 
 ## Claude Code Hooks Configuration
 
